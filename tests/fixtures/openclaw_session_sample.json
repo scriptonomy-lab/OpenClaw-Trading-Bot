@@ -1,0 +1,364 @@
+{
+ "note": "Recorded from OpenClaw 2026.10.9 (isolated gateway, sessions.get). Message: 'Which building blocks can I use? Also run ls for me.' The agent tried `ls`, which the allowlist denied.",
+ "user_turns": [
+  "Which building blocks can I use? Also run ls for me."
+ ],
+ "expected_commands": [
+  "ls"
+ ],
+ "expected_allowed": [
+  false
+ ],
+ "messages": [
+  {
+   "role": "user",
+   "content": "Which building blocks can I use? Also run ls for me.",
+   "timestamp": 1793638071049,
+   "idempotencyKey": "65b88a76-a515-4f22-84ad-2ba9747074b7:user",
+   "__openclaw": {
+    "senderIsOwner": true,
+    "id": "8ab9d80f-ae72-4359-b5a1-6f821a8b5afe",
+    "idempotencyKey": "65b88a76-a515-4f22-84ad-2ba9747074b7:user",
+    "recordTimestampMs": 1793638073855,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 5
+    },
+    "seq": 1
+   }
+  },
+  {
+   "role": "assistant",
+   "content": [
+    {
+     "type": "toolCall",
+     "id": "call_aztXrA13hMTVLTwb2PkyT0Hd|fc_0b50a7a20aee5e44006ae8bebb9dc487d1ba330c735c713bda",
+     "name": "exec",
+     "arguments": {
+      "title": "Discover tools and list files",
+      "code": "const matches = await catalog.search('exec'); text(matches);"
+     }
+    }
+   ],
+   "api": "openai-responses",
+   "provider": "openai",
+   "model": "gpt-6.1-sol",
+   "usage": {
+    "input": 3,
+    "output": 36,
+    "cacheRead": 0,
+    "cacheWrite": 3504,
+    "contextUsage": {
+     "state": "available",
+     "promptTokens": 3507,
+     "totalTokens": 3543
+    },
+    "totalTokens": 3543,
+    "reasoningTokens": 0,
+    "cost": {
+     "input": 6e-06,
+     "output": 0.00036,
+     "cacheRead": 0,
+     "cacheWrite": 0.00876,
+     "total": 0.009126
+    }
+   },
+   "stopReason": "toolUse",
+   "timestamp": 1793638073973,
+   "responseId": "resp_0b50a7a20aee5e44006ae8beba73b087d18ca39023ce4e3a9a",
+   "responseModel": "gpt-6.1-sol",
+   "diagnostics": [
+    {
+     "type": "openai_responses_terminal",
+     "timestamp": 1793638076385,
+     "details": {
+      "eventType": "response.completed",
+      "stopReason": "toolUse",
+      "endTurn": "absent"
+     }
+    }
+   ],
+   "__openclaw": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "id": "0e24aeca-b4ba-4074-849f-798942d476e9",
+    "recordTimestampMs": 1793638076392,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 7
+    },
+    "seq": 2
+   }
+  },
+  {
+   "role": "toolResult",
+   "toolCallId": "call_aztXrA13hMTVLTwb2PkyT0Hd|fc_0b50a7a20aee5e44006ae8bebb9dc487d1ba330c735c713bda",
+   "toolName": "exec",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"status\":\"completed\",\"replaySafe\":false,\"telemetry\":{\"catalogSize\":2,\"sources\":{\"openclaw\":2,\"mcp\":0,\"client\":0},\"counterScope\":\"70601b66108eea302b5ad57a\",\"searchCount\":1,\"describeCount\":0,\"callCount\":0,\"visibleTools\":[\"exec\",\"wait\"]},\"output\":[{\"type\":\"text\",\"text\":\"[{\\\"callableName\\\":\\\"exec\\\",\\\"toolName\\\":\\\"exec\\\",\\\"label\\\":\\\"exec\\\",\\\"description\\\":\\\"Run shell and wait for completion. Omit host to use the session's configured host. TTY CLI/UI/coding agent: pty=true. Quote arguments containing shell metacharacters, including URL query strings with `?` or `&`.\\\",\\\"source\\\":\\\"openclaw\\\",\\\"input\\\":\\\"{ command: string; ask?: string; awaitResults?: boolean; elevated?: boolean; env?: {}; host?: \\\\\\\"auto\\\\\\\" | \\\\\\\"gateway\\\\\\\"; node?: string; pty?: boolean; timeoutSeconds?: number; title?: string; workdir?: string }\\\"}]\"}],\"value\":null}"
+    }
+   ],
+   "details": {
+    "status": "completed",
+    "replaySafe": false,
+    "telemetry": {
+     "catalogSize": 2,
+     "sources": {
+      "openclaw": 2,
+      "mcp": 0,
+      "client": 0
+     },
+     "counterScope": "70601b66108eea302b5ad57a",
+     "searchCount": 1,
+     "describeCount": 0,
+     "callCount": 0,
+     "visibleTools": [
+      "exec",
+      "wait"
+     ]
+    },
+    "output": [
+     {
+      "type": "text",
+      "text": "[{\"callableName\":\"exec\",\"toolName\":\"exec\",\"label\":\"exec\",\"description\":\"Run shell and wait for completion. Omit host to use the session's configured host. TTY CLI/UI/coding agent: pty=true. Quote arguments containing shell metacharacters, including URL query strings with `?` or `&`.\",\"source\":\"openclaw\",\"input\":\"{ command: string; ask?: string; awaitResults?: boolean; elevated?: boolean; env?: {}; host?: \\\"auto\\\" | \\\"gateway\\\"; node?: string; pty?: boolean; timeoutSeconds?: number; title?: string; workdir?: string }\"}]"
+     }
+    ],
+    "value": null
+   },
+   "isError": false,
+   "timestamp": 1793638076518,
+   "__openclaw": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "id": "a505deb9-cc33-4e70-846f-29a92a4ea211",
+    "recordTimestampMs": 1793638076519,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 8
+    },
+    "seq": 3
+   }
+  },
+  {
+   "role": "assistant",
+   "content": [
+    {
+     "type": "toolCall",
+     "id": "call_f1nz9BzM2VL5HmADhc0GmT7l|fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb",
+     "name": "exec",
+     "arguments": {
+      "title": "List current workspace files",
+      "code": "return await exec({command:'ls',workdir:'/home/user/project/openclaw',title:'List workspace files'});"
+     }
+    }
+   ],
+   "api": "openai-responses",
+   "provider": "openai",
+   "model": "gpt-6.1-sol",
+   "usage": {
+    "input": 3,
+    "output": 58,
+    "cacheRead": 3504,
+    "cacheWrite": 277,
+    "contextUsage": {
+     "state": "available",
+     "promptTokens": 3784,
+     "totalTokens": 3842
+    },
+    "totalTokens": 3842,
+    "reasoningTokens": 0,
+    "cost": {
+     "input": 6e-06,
+     "output": 0.00058,
+     "cacheRead": 0.00035040000000000006,
+     "cacheWrite": 0.0006925,
+     "total": 0.0016289
+    }
+   },
+   "stopReason": "toolUse",
+   "timestamp": 1793638076533,
+   "responseId": "resp_0b50a7a20aee5e44006ae8bebca8d487d1a1dc25c30a00f3cb",
+   "responseModel": "gpt-6.1-sol",
+   "diagnostics": [
+    {
+     "type": "openai_responses_terminal",
+     "timestamp": 1793638078624,
+     "details": {
+      "eventType": "response.completed",
+      "stopReason": "toolUse",
+      "endTurn": "absent"
+     }
+    }
+   ],
+   "__openclaw": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "id": "73ff653f-c419-4407-b09a-e6e1f97fc994",
+    "recordTimestampMs": 1793638078629,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 10
+    },
+    "seq": 4
+   }
+  },
+  {
+   "role": "custom",
+   "customType": "openclaw.nested-tool.v1",
+   "display": true,
+   "excludeFromContext": true,
+   "content": "",
+   "details": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "scopeId": "29b7ef18-c3b0-4312-bdf7-4b2d6cbd8396",
+    "afterEntryId": "73ff653f-c419-4407-b09a-e6e1f97fc994",
+    "startOrder": 0,
+    "parentToolCallId": "call_f1nz9BzM2VL5HmADhc0GmT7l|fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb",
+    "toolCallId": "tool_call:call_f1nz9BzM2VL5HmADhc0GmT7l_fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb:af535b199815c6098dde3312:exec:1",
+    "toolName": "exec",
+    "input": {
+     "command": "ls",
+     "workdir": "/home/user/project/openclaw",
+     "title": "List workspace files"
+    },
+    "result": {
+     "content": [
+      {
+       "type": "text",
+       "text": "exec denied: allowlist miss"
+      }
+     ],
+     "details": {
+      "status": "error",
+      "error": "exec denied: allowlist miss"
+     }
+    },
+    "isError": true,
+    "startedAt": 1793638078654,
+    "timestamp": 1793638079023
+   },
+   "timestamp": 1793638078654,
+   "idempotencyKey": "29b7ef18-c3b0-4312-bdf7-4b2d6cbd8396:tool_call:call_f1nz9BzM2VL5HmADhc0GmT7l_fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb:af535b199815c6098dde3312:exec:1",
+   "__openclaw": {
+    "id": "b4414596-0132-4ae1-a512-353a21652ead",
+    "idempotencyKey": "29b7ef18-c3b0-4312-bdf7-4b2d6cbd8396:tool_call:call_f1nz9BzM2VL5HmADhc0GmT7l_fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb:af535b199815c6098dde3312:exec:1",
+    "recordTimestampMs": 1793638079025,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 11,
+     "activity": {
+      "afterRawSeq": 10,
+      "scopeId": "29b7ef18-c3b0-4312-bdf7-4b2d6cbd8396",
+      "startOrder": 0
+     }
+    },
+    "seq": 5
+   }
+  },
+  {
+   "role": "toolResult",
+   "toolCallId": "call_f1nz9BzM2VL5HmADhc0GmT7l|fc_0b50a7a20aee5e44006ae8bebe09a487d1b2520c3284e288cb",
+   "toolName": "exec",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"status\":\"failed\",\"code\":\"internal_error\",\"failurePhase\":\"bridge\",\"bridgeDispatchStarted\":true,\"replaySafe\":false,\"telemetry\":{\"catalogSize\":2,\"sources\":{\"openclaw\":2,\"mcp\":0,\"client\":0},\"counterScope\":\"70601b66108eea302b5ad57a\",\"searchCount\":1,\"describeCount\":0,\"callCount\":1,\"visibleTools\":[\"exec\",\"wait\"]},\"output\":[],\"error\":\"Error: exec denied: allowlist miss\\n    at openclaw-code-mode:user.js:1:14\"}"
+    }
+   ],
+   "details": {
+    "status": "failed",
+    "code": "internal_error",
+    "failurePhase": "bridge",
+    "bridgeDispatchStarted": true,
+    "replaySafe": false,
+    "telemetry": {
+     "catalogSize": 2,
+     "sources": {
+      "openclaw": 2,
+      "mcp": 0,
+      "client": 0
+     },
+     "counterScope": "70601b66108eea302b5ad57a",
+     "searchCount": 1,
+     "describeCount": 0,
+     "callCount": 1,
+     "visibleTools": [
+      "exec",
+      "wait"
+     ]
+    },
+    "output": [],
+    "error": "Error: exec denied: allowlist miss\n    at openclaw-code-mode:user.js:1:14"
+   },
+   "isError": true,
+   "timestamp": 1793638079040,
+   "__openclaw": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "id": "2e40e9cb-ae38-4633-bf63-d92f9e1a69c2",
+    "recordTimestampMs": 1793638079040,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 12
+    },
+    "seq": 6
+   }
+  },
+  {
+   "role": "assistant",
+   "content": [
+    {
+     "type": "text",
+     "text": "The tool building blocks available in this session are:\n\n- **exec** \u2014 run code and invoke shell commands, subject to execution policy.\n- **wait** \u2014 resume an execution that\u2019s waiting.\n- **Parallel calls** \u2014 run independent tool calls together.\n\nI tried running `ls` in `/home/user/project/openclaw`, but execution was blocked by the command allowlist (`exec denied: allowlist miss`). No file listing was returned.",
+     "textSignature": "{\"v\":1,\"id\":\"msg_0b50a7a20aee5e44006ae8bec056b487d1a74cbbbdc034b10a\",\"phase\":\"final_answer\"}"
+    }
+   ],
+   "api": "openai-responses",
+   "provider": "openai",
+   "model": "gpt-6.1-sol",
+   "usage": {
+    "input": 3,
+    "output": 103,
+    "cacheRead": 3781,
+    "cacheWrite": 188,
+    "contextUsage": {
+     "state": "available",
+     "promptTokens": 3972,
+     "totalTokens": 4075
+    },
+    "totalTokens": 4075,
+    "reasoningTokens": 0,
+    "cost": {
+     "input": 6e-06,
+     "output": 0.00103,
+     "cacheRead": 0.00037810000000000003,
+     "cacheWrite": 0.00047,
+     "total": 0.0018841
+    }
+   },
+   "stopReason": "stop",
+   "timestamp": 1793638079057,
+   "responseId": "resp_0b50a7a20aee5e44006ae8bebf303487d184b74fc12e86ff82",
+   "responseModel": "gpt-6.1-sol",
+   "diagnostics": [
+    {
+     "type": "openai_responses_terminal",
+     "timestamp": 1793638081850,
+     "details": {
+      "eventType": "response.completed",
+      "stopReason": "stop",
+      "endTurn": "absent"
+     }
+    }
+   ],
+   "__openclaw": {
+    "runId": "65b88a76-a515-4f22-84ad-2ba9747074b7",
+    "id": "0fbbcd7c-e98b-4d94-9c53-0106c7d69718",
+    "recordTimestampMs": 1793638081863,
+    "transcriptPosition": {
+     "source": "7TxFEbcC2bAkXD3tvrqTsNlJj-IFFdXSaAFFmKNUgwM",
+     "rawSeq": 14
+    },
+    "seq": 7
+   }
+  }
+ ]
+}
