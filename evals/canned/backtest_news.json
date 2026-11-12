@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "data_mode": "fake",
+  "model": "evals-canned",
+  "banner": "SIMULATED DATA",
+  "strategy_id": "__STRATEGY_ID__",
+  "windows": [
+    {
+      "label": "primary",
+      "start": "2021-01-01",
+      "end": "2023-12-31",
+      "coverage_warning": "News strategies are tested on 2021 to 2023 only. News coverage for 2019 and 2020 is too thin to give results, because 'no news' there often means 'no data'. Those years are not tested.",
+      "closed_trades": 138,
+      "open_at_end": 2,
+      "too_few_trades": false,
+      "by_cost_bps": {
+        "0": {
+          "total_return_pct": 21.95,
+          "max_drawdown_pct": -17.42,
+          "sharpe": 0.81,
+          "win_rate_pct": 54.2
+        },
+        "5": {
+          "total_return_pct": 12.64,
+          "max_drawdown_pct": -18.64,
+          "sharpe": 0.71,
+          "win_rate_pct": 52.4
+        },
+        "20": {
+          "total_return_pct": -2.23,
+          "max_drawdown_pct": -21.93,
+          "sharpe": 0.43,
+          "win_rate_pct": 48.1
+        }
+      },
+      "benchmarks": {
+        "spy": {
+          "total_return_pct": 36.19,
+          "max_drawdown_pct": -33.72,
+          "sharpe": 0.62
+        },
+        "equal_weight_sp500": {
+          "total_return_pct": 29.82,
+          "max_drawdown_pct": -35.09,
+          "sharpe": 0.58
+        }
+      }
+    }
+  ],
+  "versions_tried": 1,
+  "chart_path": "outputs/simulated/charts/news.png"
+}

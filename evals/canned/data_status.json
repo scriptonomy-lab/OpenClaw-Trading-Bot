@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "data_mode": "fake",
+  "cache_coverage": "simulated",
+  "quality_report": "outputs/simulated/data_quality.md"
+}

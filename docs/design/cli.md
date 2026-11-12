@@ -1,0 +1,77 @@
+# CLI contract
+
+`bot/cli.py` is the only thing OpenClaw may run. The exec allowlist pins
+the absolute path of the `openclaw-bot` binary in the project venv and only
+allows the subcommands below. Every command prints one JSON object to
+stdout, so the agent never has to parse prose. Every number in that JSON is
+computed by Python (rule 2). No command prints raw news text.
+
+Every JSON output includes:
+
+- `"ok"`: true or false.
+- `"data_mode"`: `"live"` (real EODHD) or `"fake"` (simulated EODHD).
+  In fake mode every human-facing title, header and Telegram message starts
+  with "SIMULATED DATA", and files are saved under `outputs/simulated/`.
+  Live runs save under `outputs/live/`.
+- `"model"`: the pinned `OPENCLAW_MODEL` value, so transcripts and reports
+  record it.
+- On failure, `"errors"`: a list of short plain-English messages the agent
+  can relay as they are.
+
+Results outputs (`backtest`, `report`, the `holdout` block of `approve`,
+`paper-status`, `data-status`) also include:
+
+- `"universe"`: the sentence the agent must quote, from
+  `bot.universe.universe_label()`. In sample mode it reads "Random sample of
+  200 of 741 historical S&P 500 members (seed 20261102)."
+- `"limitations"`: a list with the sample limitations note
+  (`SAMPLE_LIMITATIONS`), or an empty list for the full universe.
+- `"universe_mode"`: `"sample"` or `"full"`.
+- `backtest`, `report` and the holdout block also carry `"benchmark_labels"`,
+  for example `"Equal-weight, same sample"` for `equal_weight_sp500`.
+
+A window with fewer than 30 closed trades has `too_few_trades: true` and a
+`note` next to its trade count. The Telegram caption, approval message and
+daily summary state the universe too.
+
+Exit code is 0 when `ok` is true and 1 otherwise.
+
+## Data mode flag
+
+The agent-facing commands (`blocks`, `validate`, `backtest`, `report`,
+`approve`, `paper-status`, `why`, `data-status`) take an optional
+`--data simulated|live` flag, written once at the very end. It sets
+`EODHD_MODE` for that one command (`simulated` is fake mode). Without the
+flag, `EODHD_MODE` decides; live is the default the gateway runs with.
+
+Fake and live already keep separate output folders and databases
+(`outputs/simulated/` and `outputs/live/`), so strategy ids, results,
+approvals and paper portfolios never mix. A simulated approval works for
+testing, says so (`simulated_approval: true` and `approval_note`), and only
+writes to the simulated database. The live holdout record is never touched.
+The cron commands `paper-update` and `daily-summary` do not take the flag.
+
+## Commands
+
+| Command | Who calls it | What it does |
+|---|---|---|
+| `openclaw-bot blocks` | agent | Lists supported blocks, their parameters, bounds and the closest-supported mapping, as JSON. |
+| `openclaw-bot validate '<strategy json>'` | agent | Validates a strategy definition. Saves it as a draft and returns `strategy_id`, `version` (attempt number), the plain-English repeat-back text and the test window. Runs nothing. |
+| `openclaw-bot backtest <strategy_id>` | agent, only after the user confirms | Runs the backtest on the strategy's one results window (2021-2023 for news strategies; 2019-2020 is a coverage footnote only). Saves the result. Returns metrics at 0, 5 and 20 bps, the trade count, the `too_few_trades` flag, `versions_tried`, benchmark returns and a chart path. |
+| `openclaw-bot report <strategy_id>` | agent | Returns the saved result for a strategy without rerunning it. |
+| `openclaw-bot approve <strategy_id>` | agent, only after the user explicitly approves | Does not approve. Sends a one-time 6-digit code straight to the allowed Telegram user. The output never contains the code. |
+| `openclaw-bot approve <strategy_id> --code <6 digits>` | agent, with the code the user typed | Checks the code (10-minute expiry, single use, lockout after 3 wrong tries), writes the approval record, runs the holdout once and starts paper trading. Refuses a second time. |
+| `openclaw-bot paper-status` | agent | Current paper positions, cash, equity and the latest update date. |
+| `openclaw-bot why <ticker> [--date YYYY-MM-DD]` | agent | Explains a paper or backtest entry from the stored signal data: which blocks fired and their values at the decision close. |
+| `openclaw-bot paper-update` | cron command job | Pulls the latest daily data after the close, steps the paper portfolio one day using the backtest engine, and saves it. |
+| `openclaw-bot daily-summary` | cron command job | Prints a short plain-text summary for Telegram. This is the only command that prints plain text instead of JSON, because cron sends its output directly to Telegram. |
+| `openclaw-bot data-status` | agent or user | Data mode, universe, cache coverage and the data-quality report path. |
+
+Any agent command above may end with ` --data simulated` or ` --data live`.
+
+## Rules
+
+- `strategy_id` is the stable hash of the validated strategy JSON.
+- `backtest` refuses a strategy that has not been validated.
+- `approve` is the only path into `holdout_session`.
+- Commands never accept file paths or shell fragments from the agent.

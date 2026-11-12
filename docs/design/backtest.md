@@ -1,0 +1,403 @@
+# Backtest design (Phases 2 and 3)
+
+This note explains how a validated strategy becomes a trade ledger, an
+equity curve, metrics and a chart, and how paper trading reuses the same
+code. The stubs carry the exact signatures:
+
+| Module | Job |
+|---|---|
+| `bot/strategy/blocks.py` | The data bundle, the cut at the decision date, one function per block |
+| `bot/backtest/costs.py` | Cost per fill in bps per side |
+| `bot/backtest/engine.py` | `step` (one trading day), `run_backtest`, ledger and state types |
+| `bot/backtest/metrics.py` | Return statistics, trade statistics, the two benchmarks |
+| `bot/backtest/charts.py` | Equity vs benchmarks, drawdown, cost sensitivity |
+
+## Data the engine sees
+
+`MarketData` holds date x symbol tables for every price, news and earnings
+column, SPY's own frame and the membership table, all on the SPY calendar and
+all before the holdout. Nothing is forward filled.
+
+`slice_to_decision_date(market, D)` returns a `DecisionData`: every table cut
+to rows dated on or before D, plus the sorted list of S&P 500 members on D.
+Blocks and the engine only ever receive a `DecisionData`. So the engine's
+fills and stop checks are covered by the same "nothing after D" rule as the
+signals.
+
+## Blocks
+
+Every block is `block(data: DecisionData, params) -> pd.Series[bool]`,
+indexed by the members on D. One cross-section per day, rather than one bool
+per stock, because the SPY filter and the slot tie-break both need every
+stock at once, and because paper trading only ever has today's cross-section.
+
+Each block has a `measure_*` partner that returns the number behind it (gap
+in percent, RSI and so on). `signal_values` stores those numbers with each
+trade, so "why did you buy AMD?" is answered from Python's numbers.
+
+Shared rules: missing data gives False; blocks are scale-free (returns,
+ratios, averages and RSI of one series, never an adjusted price level);
+percent values are in percent units. Exact definitions are in
+`docs/design/strategy_schema.md`. Three choices worth calling out:
+
+- **Gap** = (open[D] + dividend[D]) / close[D-1] - 1. The open of D is known
+  at the close of D. The dividend is added back so an ex-dividend day is not a
+  fake gap down.
+- **RSI** is Wilder's, period 14 by default, computed over a fixed window of
+  the last 251 closes. Wilder's smoothing is recursive, so without a fixed
+  window its value depends on where the loaded history starts. Paper trading
+  may load less history than the backtest, and the two must agree. Paper
+  trading must load at least 251 days. A stock with less history uses what it
+  has (at least period + 1 closes), which is the same in both.
+- **Relative volume** = volume[D] / mean(volume over the previous N days),
+  excluding D. Including D would let a spike raise its own baseline. Volume
+  is only ever a ratio within one stock, so `MarketData`
+  holds it as one Series per stock (`volume_by_symbol`), not as a date x
+  symbol table. That makes a cross-stock or dollar-volume use hard to write
+  by accident. `wide_panel` refuses the volume column for the same reason.
+- **Earnings** use two sessions (review M2): days to next counts to the
+  earliest possible reaction session, days since last from the latest one.
+
+### The lookahead test
+
+For a sample of decision dates D and every block type, signals must be equal
+when computed two ways:
+
+1. Build `MarketData` from all pre-holdout raw rows, then slice at D.
+2. Rebuild `MarketData` from raw rows cut at D, then slice at D.
+
+Rebuilding is the strict part (data_layer.md, section "Building blocks and
+the lookahead test"): split anchoring moves adjusted price levels when a split falls
+between D and 2023, so only a scale-free block passes. How each source is cut:
+prices, splits and dividends on or before D; news articles published before
+16:00 New York on D; daily sentiment rows dated before D; membership row D.
+Earnings are the one designed exception: `days_to_next` may see a reaction
+session up to 10 trading days ahead, and an after-market report needs
+the full calendar to place its reaction session. So the rebuild keeps events
+whose reaction session is at most 10 trading days after D and aligns them on
+the full pre-holdout calendar. The test also checks that nothing beyond that
+is visible.
+
+Same-open strategies get a second version of the test, with the cut at 09:30
+New York on D. The rebuild keeps D's row (so D's open and any dividend or
+split going ex on D are there) but overwrites D's high, low and close with its
+open and multiplies D's volume by 1000, for every stock and SPY, and keeps
+only news published before 09:30 on D. Every condition, the open-time
+measures, every `rank_by` number and the stored signal values from
+`slice_to_open` must equal the full-history values. A teeth test reads the
+same rebuild as if it were D's close and checks that moving-average, RSI,
+relative-volume and news answers do change, so a block that secretly read
+D's close, volume or afternoon news would be caught.
+
+## The day step
+
+`step(state, data, strategy, costs, *, allow_new_entries) -> StepResult`
+processes one trading day D. It is pure: it returns a new state and never
+changes the one it was given. The order of work:
+
+1. **Splits and dividends** for positions held overnight. A split multiplies
+   shares and divides the stop and target prices by its factor. A dividend
+   with ex-date D is paid as cash to shares held at the close of D-1. This
+   matches `total_return`: a stock bought at the open of D gets nothing,
+   and one sold at the open of D still gets it.
+2. **Ended data.** A held stock with no row on D is closed at its last
+   available close, exit_reason `data_ended`, flagged. Neither a backtest nor
+   a paper trader can tell on the day whether a missing row is a delisting, so
+   this is the only rule both can follow. The true exit value may differ (a
+   takeover price, or a bankruptcy loss), so the report lists these trades.
+3. **Fills at the open of D.** Pending sells first, then pending buys, so cash
+   from sells can pay for buys. A buy for a stock with no row on D is
+   cancelled and noted.
+   **Same-open entries** (`entry_timing` `"same_open"`) come next. They are
+   decided from `slice_to_open(market, D)`: D's open, dividend, membership
+   and pre-09:30 news, plus everything up to D-1's close. They are bought at
+   D's open straight away. Free slots are `max_positions` minus the positions
+   still held after this open's sells. A stock sold at this open is not
+   bought back at it. Each buy targets the equity at D-1's close divided by
+   `max_positions`, limited by the cash left after the sells. On the first
+   day of the loaded data there is no D-1, so nothing is bought.
+4. **Stops and targets** on D's low and high, including stocks bought at
+   today's open.
+5. **Mark to market** at D's close. Days held goes up by one; the fill day is
+   day 1. Equity is net liquidation value (see "The equity curve").
+6. **Decisions at the close of D**, filled at the next open: holding-period
+   sells, then new buys for `next_open` strategies if `allow_new_entries` is
+   True.
+
+### Fills and prices
+
+- `next_open`: signals at the close of D fill at the open of D+1.
+  `same_open`: signals at 09:30 on D fill at the open of D. Neither ever
+  fills at a price from later in the day than the decision.
+- Ledger prices are **raw, as-traded** prices. The canonical frame has raw
+  close only, so raw open, high and low are the adjusted values times
+  raw_close / close on the same row. Raw prices never change when a later
+  split enters the data. So a backtest (anchored on the last split before
+  2024) and a paper trader (whose frames are rebuilt on later days) record
+  the same prices, and trades can be checked by hand against raw EODHD rows,
+  as the brief asks. Splits during a hold change the share count instead.
+- Shares are fractional. Cash never goes below zero: no leverage, no shorts.
+
+### Costs
+
+`fill_cost = abs(shares * fill price) * bps / 10_000` on every buy and every
+sell. 5 bps per side by default; every report also shows 0 and 20 bps
+(`run_cost_sensitivity`). A buy is sized so that notional plus cost fits in
+cash (`affordable_notional`).
+
+### Exits
+
+- **Holding period** counts trading days from the fill. With
+  `holding_days = 3`, a stock bought at the open of day F is held on F, F+1
+  and F+2, gets its sell order at the close of F+2, and is sold at the open of
+  F+3.
+- **Stop loss** at buy price * (1 - stop%). Hit when the day's low is at or
+  below it. Fill at the lower of the day's open and the stop price. If the
+  stock opens below the stop (a gap through), the fill is at the open, which
+  is worse than the stop. That is what a real stop order would get.
+- **Profit target** at buy price * (1 + target%). Hit when the day's high is
+  at or above it. Fill at the target price, even when the stock opened above
+  it. A real order might get the better open price; we give that up on
+  purpose so the target never flatters the result.
+- **Both on one day**: daily bars do not say which came first, so the stop
+  wins.
+- Stops and targets are checked from the fill day on, using that day's low and
+  high after the open fill.
+
+These choices lean conservative. They can only make results look worse than a
+real resting order would, never better.
+
+### Slots and the tie-break
+
+Free slots at the close of D = `max_positions` - open positions + positions
+with a pending sell. Candidates are the members on D whose entry signals are
+all True, minus stocks already held. A stock is never bought twice.
+
+When there are more candidates than free slots and the strategy sets
+`rank_by`, candidates are sorted by that block's number first (see
+strategy_schema.md), and the hash shuffle below only breaks ties.
+Otherwise `entry_priority` sorts them by sha256 of `"strategy_id|D|symbol"`. This is a fixed, repeatable shuffle. It
+uses nothing from the future, does not favour early letters of the alphabet
+(sorting by ticker would), and gives the paper trader the same order as the
+backtest. The number of signals that did not get a slot is kept in the notes
+so the report can say how often slots ran out.
+
+For research only, `run_backtest(..., tiebreak_salt="...")` appends
+`"|salt"` to the hashed text. That gives another shuffle that is just as
+fair, so `scripts/tiebreak_sensitivity.py` can show how much a result depends
+on which tied stocks happened to win a slot. Strategies and the paper trader
+cannot set the salt; with no salt the text hashed is exactly as before.
+
+Each buy targets equity at the decision close divided by `max_positions`
+(net liquidation value, the same number the equity curve shows; for
+`same_open`, the close of D-1). At the fill it is limited by the cash
+available after that open's sells.
+
+### Index changes while holding
+
+Entries need membership on D. A stock that leaves the index while held is
+kept until one of its exit rules fires. Exits never depend on membership.
+
+### The end of the test and the holdout
+
+`run_backtest` passes `allow_new_entries=False` on the last trading day of the
+window, because the next open is outside it. That flag only blocks entries
+decided at a close. Same-open entries on the last day fill at that day's
+open, inside the window, so they are allowed and end as `open_at_end`. For any window ending 2023-12-31 (the news window is 2021-2023)
+that day is 2023-12-29, whose next open (2024-01-02) is in the
+holdout. So no entry fills in the holdout. This is a general rule about
+windows, not a date check inside `step`.
+
+Positions still open after the last day are valued at the last close, net of
+one sell cost, by `close_out_at_end`, and appear in the ledger with
+exit_reason `open_at_end`. This is the same value the last equity point
+already shows, so no end-of-test adjustment is needed. Holding-period sells that would fill in the holdout
+are not filled. `run_backtest` calls `assert_before_holdout(window.end)`
+first, so a window that reaches into 2024 raises unless the approval session
+is open. The approved holdout run starts from fresh cash on 2024-01-01 and
+does not carry positions from the in-sample test.
+
+## Paper trading uses the same step
+
+The paper trader (Phase 5) runs after each close:
+
+1. Load the saved `PortfolioState` (`state_from_json`).
+2. Build `MarketData` from data up to today and slice it at today.
+3. Call `step(state, data, strategy, costs, allow_new_entries=True)`.
+4. Save the new state (`state_to_json`) and append the closed trades.
+
+There is no second copy of the fill, stop, sizing or dividend logic. The
+parity test replays the paper trader over a historical window, saving and
+reloading the state through JSON every day, and requires the ledger and the
+equity curve to equal `run_backtest` on the same window, every point
+included. Raw ledger prices, the fixed RSI window, the hash tie-break and one
+definition of equity are what make that equality possible. A same-open
+strategy needs nothing extra: `step` decides and fills its buys at each day's
+open, in both paths.
+
+## The equity curve
+
+Every point is **net liquidation value**: cash, plus each open position at
+that day's raw close, minus the cost of selling it (`fill_cost`, the same
+bps as every other fill). The curve has the columns `cash`,
+`holdings_value` (market value at the close), `liquidation_cost` and
+`equity` = cash + holdings_value - liquidation_cost.
+
+Why net rather than gross: before this change only the last point took off
+the sell cost of open positions, so the last step of the curve held a small
+fake loss, and drawdown and Sharpe mixed two kinds of points. With one
+definition, each day's return compares like with like, the last point needs
+no special case (it equals starting capital plus the pnl of every trade), and
+the paper trader's saved equity equals the backtest's on every day. Sizing
+uses the same equity number, so "equity" means one thing everywhere. The
+cost: during a hold the curve sits slightly below market value, by the sell
+cost of what is held (5 bps of holdings by default).
+
+## Metrics
+
+Computed only in `bot/backtest/metrics.py`:
+
+- Total return, CAGR (calendar days / 365.25), max drawdown (negative
+  percent), all on the net liquidation curve.
+- Sharpe: mean daily return / standard deviation (ddof=1) * sqrt(252). The
+  risk-free rate is 0 and the report says so. None when the spread is 0.
+- Win rate: closed trades with pnl > 0, excluding `open_at_end`.
+- Closed trade count, open-at-end count, data-ended count, average trade
+  return.
+- `too_few_trades` when closed trades are fewer than `MIN_TRADES_TO_JUDGE`
+  (30). The report then says the result is too thin to judge.
+- `versions_tried`, passed in from storage, never from the agent.
+
+## Benchmarks
+
+Both include dividends, have no costs, and start at 1.0 at the close of the
+window's first day, like the strategy.
+
+- **SPY**: buy and hold, from SPY's `total_return`.
+- **Equal-weight S&P 500, rebalanced daily**: day D's return is the average
+  `total_return` on D over stocks that were members at the close of D-1 and
+  have a row on D. Membership is taken from D-1 because that is what was
+  known when the portfolio was set. A stock whose data ends drops out that
+  day and is not forward filled. Daily rebalancing is chosen because it is the
+  simplest to explain ("the average member's return each day") and needs no
+  holdings bookkeeping. It pays no rebalancing costs, so it is slightly
+  flattering to the benchmark, which is the safe direction. One known gap: if
+  a stock's data ends before its final drop, that drop is missing from the
+  benchmark too.
+
+## Charts
+
+`plot_equity_vs_benchmarks` draws the strategy, SPY and the equal-weight
+index, all starting at 100. `plot_drawdown` and `plot_cost_sensitivity`
+add the drawdown over time and the curve at 0, 5 and 20 bps. Every chart
+states the cost level, the window and the number of versions tried, so it is
+not misleading when shared alone.
+
+## Open points for the quant reviewer
+
+1. Target fills at the target price even on a gap up. Conservative, but a
+   reviewer may prefer the realistic open fill.
+2. `data_ended` exits at the last close. Takeovers usually end near the deal
+   price, which the last close reflects. Bankruptcies can end far lower. We
+   flag rather than guess.
+3. The hash tie-break is fair but arbitrary. `rank_by` now lets a user pick
+   an order ("biggest gap first"); without it the shuffle decides.
+   `scripts/tiebreak_sensitivity.py` measures how much the shuffle matters.
+4. Every equity point, not only the last, is net of the cost of selling open
+   positions. This lowers the curve a little during holds.
+
+## Paper trading and the holdout guard (Phase 5)
+
+Paper trading reads data from 2024 on by design, which the holdout guard
+forbids. The way through is the approval flow, and only that:
+
+1. `approve <id>` sends a one-time code to the user on Telegram. With the
+   right code, `approve <id> --code <code>` writes the approval record and
+   runs the single holdout test inside `holdout_session`. That session
+   marks the approval as used before it opens.
+2. The same command then records the paper start day and takes the first
+   paper step.
+3. Every paper step runs inside `holdout.paper_session(strategy_id)`. It
+   opens the same session flag as `holdout_session`, so the client wrappers
+   accept `approved=True`. It never marks an approval, because that is single
+   use. It refuses unless the approval row exists and is already used, and a
+   paper run row exists for the strategy. So a strategy that never passed the
+   approval flow cannot read forward data.
+4. Membership inside a session. The normal cache of S&P 500
+   membership is clipped at the end of 2023, so a holdout or paper run that
+   read it would see 2023 membership frozen forward. Inside any session,
+   `get_index_history` therefore never reads the normal cache. It fetches
+   the full, unclipped history into the session cache, and the membership
+   parser keeps the 2024 and later rows when `approved=True` and a session
+   is open. Outside a session nothing changes: the history is clipped before
+   it is cached, and no 2024 or later date ever reaches the normal cache.
+5. Two session caches. The holdout run is a one-time run, so it uses a
+   session cache (`<mode>-holdout`) that is deleted when the session closes.
+   Paper trading runs every day, so it uses a forward cache
+   (`<mode>-forward`) that is kept between updates. Only code inside a paper
+   session can read or write it. The close hooks do not delete it, and no
+   normal read or holdout session ever looks at it.
+   - Series with a date range (prices, dividends, news, sentiment, earnings)
+     are stored once per ticker. The entry records the last row date it
+     actually received, never the requested end day (H2). Each update fetches
+     again from five trading days before that date, replaces the rows in that
+     window, and removes duplicates, so a bar, an article or a sentiment row
+     published late is picked up on the next update. A day counts as settled
+     only from 18:00 New York time. A repeat update that asks for a day an
+     earlier settled fetch already covered makes no calls at all. If SPY's bar
+     is missing at fetch time, the day is fetched again on the next update, so
+     the calendar never loses it.
+   - Other entries are fetched again when old: membership and splits after
+     one day (H3), other plain entries after seven days. Dividends are a
+     range series and follow the rule above.
+6. Earnings beyond today (H1). The calendar lists scheduled reports, so
+   reading it past today is not lookahead. In a paper session the earnings
+   request ends `EARNINGS_VISIBILITY_TRADING_DAYS` plus 20 trading days
+   after today (about 45 calendar days). Outside a paper session the end is
+   unchanged and the holdout guard still refuses it. So `days_to_next_earnings`
+   is the same whether the update runs daily, after a gap, or as one
+   backtest-style load. The fake calendar only holds reports up to its last
+   price day, and its future rows carry `actual` values; no block reads
+   `actual` yet, but a future surprise block must not use it before the
+   latest reaction session.
+7. Unexplained jumps (H3). Before each day is stepped, every held stock and
+   every index member is checked: if its raw close against the previous raw
+   close, after the day's listed split factor, still looks like a common
+   split ratio (5% tolerance, as in split inference), the update raises
+   `UnexplainedPriceJumpError`. That day is not saved. A later update retries
+   after the split list refreshes. A real one-day move of exactly that size
+   with no split would also stop the update until it is looked at by hand.
+
+`paper_update(strategy_id, today)` loads data up to today, then calls
+`engine.step` once per trading day after the last saved state (it catches up
+after missed days), saving the state, the equity row and the closed trades
+for each day. No trading logic lives in the paper module. Paper fills come
+from the daily bars after each close.
+
+"Today" is the current New York date in live mode. In fake mode it is the last
+day of the simulated data, unless the environment variable
+`OPENCLAW_BOT_TODAY` is set. The variable is read only in fake mode and the
+agent cannot set it. The holdout runs from 2024-01-01 to that day, and paper
+trading starts on it with fresh cash.
+
+`replay_paper(strategy, market, window)` replays a window with a JSON round
+trip of the state every day, for the parity test. It blocks new entries on
+the last day and values open positions at the end, as `run_backtest` does,
+so the two results can be compared directly.
+
+## Missing rows and gaps (added after the Phase 3 review)
+
+- A row with an open, high, low or close at or below zero, or a high below
+  the low, is treated as a missing day (`prices.invalid_price_rows` lists
+  them for the data-quality report).
+- A held stock with a missing row stays held and is marked at its last
+  close. Only after `DATA_ENDED_AFTER_MISSING_SESSIONS` (5) missing sessions
+  in a row is it closed as `data_ended`, at the last available close, dated
+  on the first missing session. A halt does not let the strategy dodge the
+  move that follows it.
+- An exit that falls due during a gap waits and fills at the first open
+  after the gap, keeping its original decision date. A stop fills at the
+  lower of that open and the stop. A target gapped through fills at the
+  open, flagged `gap_fill`.
+- `step` raises `SkippedTradingDayError` if a trading day is missing between
+  the saved state and today. The paper trader replays every day in order.

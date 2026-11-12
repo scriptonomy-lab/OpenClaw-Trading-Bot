@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "data_mode": "fake",
+  "banner": "SIMULATED DATA",
+  "strategy_id": "__STRATEGY_ID__",
+  "holdout": {
+    "start": "2024-01-01",
+    "total_return_pct": 4.12,
+    "max_drawdown_pct": -9.35,
+    "sharpe": 0.38,
+    "closed_trades": 9,
+    "too_few_trades": true
+  },
+  "paper_trading_started": true
+}

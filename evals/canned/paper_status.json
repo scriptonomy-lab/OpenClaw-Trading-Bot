@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "data_mode": "fake",
+  "banner": "SIMULATED DATA",
+  "positions": [
+    {
+      "ticker": "AMD",
+      "shares": 12.5,
+      "entry_price": 101.2
+    }
+  ],
+  "cash": 8123.45,
+  "equity": 10388.2,
+  "last_update": "2023-12-29"
+}

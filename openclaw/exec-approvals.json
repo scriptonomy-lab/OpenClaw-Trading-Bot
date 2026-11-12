@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "defaults": {
+    "security": "deny",
+    "ask": "off",
+    "askFallback": "deny",
+    "autoAllowSkills": false
+  },
+  "agents": {
+    "main": {
+      "security": "allowlist",
+      "ask": "off",
+      "askFallback": "deny",
+      "autoAllowSkills": false,
+      "allowlist": [
+        {
+          "pattern": "<ABSOLUTE_PATH_TO_REPO>/.venv/bin/openclaw-bot",
+          "argPattern": "^(?:(?:blocks|paper-status|data-status|validate \\{(?:[A-Za-z0-9_.,:%&\"{}\\[\\]+\\-]| (?!-[^0-9])){0,3998}\\}|(?:backtest|report) strat_[0-9a-f]{16}|approve strat_[0-9a-f]{16}(?: --code [0-9]{6})?|why [A-Z]{1,5}(?:[.\\-][A-Z]{1,2})?(?: --date [0-9]{4}-[0-9]{2}-[0-9]{2})?)(?: --data (?:simulated|live))?)$"
+        }
+      ]
+    }
+  }
+}

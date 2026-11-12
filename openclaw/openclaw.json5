@@ -1,0 +1,152 @@
+// OpenClaw config TEMPLATE for the strategy-lab bot.
+//
+// Do not copy this file by hand. Run
+//   uv run python scripts/render_openclaw_config.py
+// which fills the angle-bracket placeholders from .env and writes
+// openclaw/rendered/openclaw.json5 (git-ignored). See openclaw/README.md.
+//
+// Secrets never live here. The Telegram token is read from the environment
+// with ${VAR} substitution, and the OpenAI key is stored by `openclaw onboard`.
+// Source for substitution and the ~/.openclaw/.env fallback:
+// https://docs.openclaw.ai/gateway/configuration/environment-variables
+//
+// OpenClaw refuses to start on unknown keys, so every key below is taken
+// from the page linked next to it. Check with `openclaw doctor` after any edit.
+{
+  agents: {
+    defaults: {
+      // Pinned OpenAI model (D8). Must equal OPENCLAW_MODEL in .env, which
+      // the renderer copies here, so evals and reports log the same id.
+      // https://docs.openclaw.ai/gateway/config-agents/models
+      model: { primary: "<OPENCLAW_MODEL>" },
+
+      // The workspace is openclaw/ in this repo, not the repo root, because
+      // the repo root holds .env. With tools.fs.workspaceOnly the agent can
+      // only read inside this folder. The skill sits at
+      // <workspace>/skills/strategy-lab/SKILL.md, the highest-precedence
+      // skill location, so no extra skill directory is needed.
+      // https://docs.openclaw.ai/gateway/config-agents/workspace-and-bootstrap
+      // https://docs.openclaw.ai/tools/skills (Loading order)
+      workspace: "<ABSOLUTE_PATH_TO_REPO>/openclaw",
+
+      // Do not create AGENTS.md, SOUL.md and the other starter files inside
+      // the repo. The skill carries all instructions.
+      // https://docs.openclaw.ai/gateway/config-agents/workspace-and-bootstrap
+      skipBootstrap: true,
+
+      // Only our skill is visible to the agent. Bundled skills stay hidden.
+      // https://docs.openclaw.ai/gateway/config-agents/workspace-and-bootstrap
+      // https://docs.openclaw.ai/tools/skills (Agent allowlists)
+      skills: ["strategy-lab"],
+    },
+  },
+
+  channels: {
+    telegram: {
+      // https://docs.openclaw.ai/channels/telegram/setup
+      enabled: true,
+      // Read from TELEGRAM_BOT_TOKEN in the Gateway's environment or in
+      // ~/.openclaw/.env. Never paste the token here.
+      // https://docs.openclaw.ai/gateway/configuration/environment-variables
+      botToken: "${TELEGRAM_BOT_TOKEN}",
+
+      // Only the listed numeric Telegram user IDs may DM the bot. The docs:
+      // "One-owner bots should use `allowlist` with numeric user IDs."
+      // https://docs.openclaw.ai/channels/telegram/access-control
+      dmPolicy: "allowlist",
+      allowFrom: ["<TELEGRAM_USER_ID_LIST>"],
+
+      // DMs only. The bot ignores every group.
+      // https://docs.openclaw.ai/channels/telegram/access-control
+      groupPolicy: "disabled",
+    },
+  },
+
+  commands: {
+    // Turns off /restart and /update from chat.
+    // https://docs.openclaw.ai/gateway/security/tool-permissions
+    restart: false,
+  },
+
+  tools: {
+    // Start from the smallest profile and add back only the two tools the
+    // skill needs: exec (to run openclaw-bot) and read (to load SKILL.md,
+    // which the skill catalog points at). Deny wins over allow.
+    // https://docs.openclaw.ai/gateway/config-tools/tool-policy
+    profile: "minimal",
+    alsoAllow: ["exec", "read"],
+
+    // Everything risky is denied by name and by group, so a new tool in one
+    // of these groups stays off too. Group names and members are listed at
+    // https://docs.openclaw.ai/gateway/config-tools/tool-policy (Tool groups).
+    // The first four are the docs' default deny for untrusted content:
+    // https://docs.openclaw.ai/gateway/security/tool-permissions
+    deny: [
+      "gateway",
+      "cron",
+      "sessions_spawn",
+      "sessions_send",
+      "browser",
+      "web_fetch",
+      "web_search",
+      "write",
+      "edit",
+      "apply_patch",
+      "process",
+      "code_execution",
+      "automations",
+      "openclaw",
+      "plugins",
+      "message",
+      "nodes",
+      "computer",
+      "canvas",
+      "skill_workshop",
+      "group:web",
+      "group:ui",
+      "group:sessions",
+      "group:automation",
+      "group:nodes",
+      "group:media",
+      "group:memory",
+      "group:messaging",
+    ],
+
+    exec: {
+      // Run on the Gateway host (where the venv lives), never "auto".
+      // https://docs.openclaw.ai/tools/exec (Config)
+      host: "gateway",
+
+      // Only allowlisted commands run. Misses are denied without asking.
+      // The allowlist itself lives in the approvals document applied with
+      // `openclaw approvals set` (openclaw/exec-approvals.json).
+      // https://docs.openclaw.ai/tools/exec-approvals
+      mode: "allowlist",
+
+      // Meant to switch off the stdin-only "safe bins" (the defaults are cut,
+      // uniq, head, tail, tr, wc), so openclaw-bot is the only thing that
+      // runs. The docs do not say outright that an empty list clears the
+      // defaults. Check with `openclaw exec-policy show --agent main`.
+      // https://docs.openclaw.ai/tools/exec-approvals-advanced (Safe bins)
+      safeBins: [],
+
+      // Puts the project venv first on PATH so the skill can call the bare
+      // name `openclaw-bot`. The allowlist still pins the absolute path, so
+      // any other openclaw-bot found on PATH is a miss.
+      // https://docs.openclaw.ai/tools/exec (PATH handling)
+      pathPrepend: ["<ABSOLUTE_PATH_TO_REPO>/.venv/bin"],
+    },
+
+    fs: {
+      // read is limited to the workspace (openclaw/ in this repo).
+      // https://docs.openclaw.ai/gateway/security/tool-permissions
+      workspaceOnly: true,
+    },
+
+    elevated: {
+      // No break-glass exec outside policy, and no "!" shell commands.
+      // https://docs.openclaw.ai/tools/elevated
+      enabled: false,
+    },
+  },
+}

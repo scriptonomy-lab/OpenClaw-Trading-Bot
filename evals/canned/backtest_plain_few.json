@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "data_mode": "fake",
+  "model": "evals-canned",
+  "banner": "SIMULATED DATA",
+  "strategy_id": "__STRATEGY_ID__",
+  "windows": [
+    {
+      "label": "primary",
+      "start": "2016-01-01",
+      "end": "2023-12-31",
+      "coverage_warning": null,
+      "closed_trades": 12,
+      "open_at_end": 2,
+      "too_few_trades": true,
+      "by_cost_bps": {
+        "0": {
+          "total_return_pct": 2.88,
+          "max_drawdown_pct": -17.42,
+          "sharpe": 0.81,
+          "win_rate_pct": 54.2
+        },
+        "5": {
+          "total_return_pct": -6.43,
+          "max_drawdown_pct": -18.64,
+          "sharpe": 0.71,
+          "win_rate_pct": 52.4
+        },
+        "20": {
+          "total_return_pct": -21.3,
+          "max_drawdown_pct": -21.93,
+          "sharpe": 0.43,
+          "win_rate_pct": 48.1
+        }
+      },
+      "benchmarks": {
+        "spy": {
+          "total_return_pct": 17.12,
+          "max_drawdown_pct": -33.72,
+          "sharpe": 0.62
+        },
+        "equal_weight_sp500": {
+          "total_return_pct": 10.75,
+          "max_drawdown_pct": -35.09,
+          "sharpe": 0.58
+        }
+      }
+    }
+  ],
+  "versions_tried": 3,
+  "chart_path": "outputs/simulated/charts/plain_few.png"
+}
