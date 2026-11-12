@@ -20,8 +20,8 @@ the idea loses money. If you approve it, it runs one sealed final test and then 
 You need a Mac or Linux terminal and git. Nothing else, and no accounts or keys.
 
 ```bash
-git clone https://github.com/katsdivi/Scriptonomy-EODHD-OpenClaw.git
-cd Scriptonomy-EODHD-OpenClaw
+git clone https://github.com/scriptonomy-lab/OpenClaw-Trading-Bot.git
+cd openclaw-trading-bot
 ./setup.sh
 ./demo.sh
 ```
